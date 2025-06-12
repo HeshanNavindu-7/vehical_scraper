@@ -1,29 +1,33 @@
-import sqlite3
-from .config import DB_PATH
+import psycopg2
+from .config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 from .utils import setup_logging
 
 logger = setup_logging()
 
 class DatabaseManager:
-    def __init__(self, db_path=DB_PATH):
-        self.db_path = db_path
+    def __init__(self):
         self.conn = None
         self.cursor = None
-        self._connect()
+        self.connect()
         self.create_table()
 
-    def _connect(self):
+    def connect(self):
         if self.conn is None:
-            self.conn = sqlite3.connect(self.db_path)
+            self.conn = psycopg2.connect(
+                host=DB_HOST,
+                port=DB_PORT,
+                dbname=DB_NAME,
+                user=DB_USER,
+                password=DB_PASSWORD
+            )
             self.cursor = self.conn.cursor()
-            logger.info(f"Connected to DB: {self.db_path}")
+            logger.info(f"Connected to DB: {DB_NAME} at {DB_HOST}")
 
     def create_table(self):
-        self._connect()
         try:
             self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS listings (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 date TEXT,
                 make TEXT,
                 type TEXT,
@@ -40,19 +44,18 @@ class DatabaseManager:
                 fuel_type TEXT,
                 post_url TEXT UNIQUE,
                 image_url TEXT,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """)
             self.conn.commit()
             logger.info("Listings table ensured.")
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.critical(f"Error creating listings table: {e}")
             raise
 
     def insert_listings_batch(self, listings_data):
         if not listings_data:
             return 0
-        self._connect()
         data_tuples = [(
             d.get('date', ''), d.get('make', ''), d.get('type', ''),
             d.get('title', ''), d.get('location', ''), d.get('mileage', ''),
@@ -64,37 +67,33 @@ class DatabaseManager:
 
         try:
             self.cursor.executemany("""
-            INSERT OR IGNORE INTO listings (
+            INSERT INTO listings (
                 date, make, type, title, location, mileage,
                 overview_price, detail_price, engine_cc, yom,
                 post_make, model, gear, fuel_type, post_url, image_url
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (post_url) DO NOTHING
             """, data_tuples)
             self.conn.commit()
             inserted = self.cursor.rowcount
             logger.info(f"Inserted {inserted} new listings.")
             return inserted
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"DB insert error: {e}")
             self.conn.rollback()
             return 0
 
     def get_all_post_urls(self):
-        self._connect()
         try:
             self.cursor.execute("SELECT post_url FROM listings")
             urls = {row[0] for row in self.cursor.fetchall() if row[0]}
             return urls
-        except sqlite3.Error as e:
+        except Exception as e:
             logger.error(f"Error fetching URLs: {e}")
             return set()
 
     def close(self):
         if self.conn:
+            self.cursor.close()
             self.conn.close()
             logger.info("DB connection closed.")
-            self.conn = None
-            self.cursor = None
-
-    def __del__(self):
-        self.close()

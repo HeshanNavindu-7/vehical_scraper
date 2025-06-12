@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:13
+    container_name: riyasewana_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: riyasewana
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  scraper:
+    build: .
+    container_name: riyasewana_scraper
+    restart: on-failure
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=riyasewana
+      - DB_USER=myuser
+      - DB_PASSWORD=mypassword
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  db_data:

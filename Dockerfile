@@ -1,34 +1,33 @@
-# Use the official Python base image
+# Use a lightweight Python image
 FROM python:3.9-slim
 
-# Install dependencies for Chrome and WebDriver
+# Install dependencies for Chromium
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
     unzip \
     chromium \
-    chromium-driver
+    chromium-driver \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set the environment variable for Chrome
+# Set Chrome binary environment variable
 ENV CHROME_BIN=/usr/bin/chromium
 
-# Set the working directory inside the container
+# Set work directory
 WORKDIR /app
 
-# Copy the requirements.txt into the container
+# Copy only requirements first for caching
 COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire project (including the src directory) into the container
+# Copy project files
 COPY . .
 
-# # Set environment variable to disable Python buffering (for logs)
-# ENV PYTHONUNBUFFERED 1
+# Add .env file to container (if needed) – optional but recommended
+COPY .env .
 
-# # Set the Python path to include the src directory
-# ENV PYTHONPATH=/app/src
-
-# Command to run the scraper when the container starts
+# Command to run the scraper
 CMD ["python", "main.py"]
