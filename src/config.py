@@ -3,7 +3,7 @@ import os
 RIYASWANA_BASE_URL = "https://riyasewana.com"
 
 RIYASWANA_VEHICLE_TYPES = ['cars']
-RIYASWANA_VEHICLE_MAKES = ['volvo']
+RIYASWANA_VEHICLE_MAKES = ['toyota']
 
 DELAY_RANGE_PAGE_LOAD_SEC = (2, 5)
 DELAY_RANGE_POST_LOAD_SEC = (2, 4)
